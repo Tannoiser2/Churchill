@@ -62,6 +62,19 @@ static func leader_tex(name: String) -> Texture2D:
 	return _cell("res://assets/cards/leaders.jpg", D.LEADER_CARD[name], 4)
 
 
+## Segnalino dell'Agenda segreta (idx nel foglio; D.SA_BACK è il retro). small: solo bandiera e nome.
+static func agenda_tex(idx: int, small := false) -> Texture2D:
+	if not small:
+		return _cell("res://assets/cards/agenda.jpg", idx, 10, 160, 222)
+	var key := "agenda_small#%d" % idx
+	if not _atlas.has(key):
+		var a := AtlasTexture.new()
+		a.atlas = tex("res://assets/cards/agenda.jpg")
+		a.region = Rect2((idx % 10) * 160, (idx / 10) * 222 + 25, 160, 64)
+		_atlas[key] = a
+	return _atlas[key]
+
+
 static func back_tex(p: int) -> Texture2D:
 	return tex("res://assets/cards/back_%s.jpg" % D.POWERS[p]["key"])
 

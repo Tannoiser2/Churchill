@@ -201,6 +201,15 @@ const COUNTRIES := {
 	"dei": {"n": "Indie orientali olandesi", "sp": "kra", "col": true}, "malaya": {"n": "Malesia", "sp": "kra", "col": true},
 	"vietnam": {"n": "Vietnam", "sp": "indochina", "col": true}, "cambodia": {"n": "Cambogia/Laos", "sp": "indochina", "col": true},
 }
+## Variante Agenda segreta (10.0): i 36 segnalini nell'ordine del foglio (assets/cards/agenda.jpg, 10 colonne;
+## la cella 39 è il retro). Alcuni paesi compaiono due volte: è voluto.
+const SA_TOKENS := ["austria", "austria", "dei", "belgium", "baltic", "yugoslavia", "yugoslavia", "finland", "malaya", "norway",
+	"bulgaria", "bulgaria", "cambodia", "cambodia", "france", "france", "greece", "greece", "rumania", "rumania",
+	"hungary", "malaya", "middleeast", "middleeast", "siam", "siam", "czech", "czech", "netherlands", "denmark",
+	"poland", "poland", "vietnam", "vietnam", "persia", "persia"]
+const SA_BACK := 39
+const SA_VP := 5
+
 const COUNTRY_ORDER := ["norway", "finland", "netherlands", "belgium", "france", "denmark", "czech", "austria", "hungary",
 	"yugoslavia", "greece", "baltic", "poland", "rumania", "bulgaria", "middleeast", "persia",
 	"siam", "dei", "malaya", "vietnam", "cambodia"]

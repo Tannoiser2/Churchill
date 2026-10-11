@@ -35,6 +35,11 @@ le immagini vengono dal modulo Tabletop Simulator e non vanno distribuite pubbli
   per ogni esito (vinto da sé, da un altro, al centro), la probabilità che la conferenza vada a buon fine,
   il rischio di essere contestata, il valore di ogni passo dei fronti e di ogni supporto (con la
   concentrazione della produzione), dove servono reti e allineamenti. Non guarda mai le carte degli altri.
+- **Variante Agenda segreta** (regola 10.0, scelta nel menu): ognuno pesca a caso 3 dei 36 segnalini
+  (alcuni paesi sono doppi, com'è previsto) e li tiene nascosti. Il proprio si vede sotto le carte in mano
+  (passa il mouse per ingrandirlo). A fine partita, prima di stabilire il vincitore, ogni segnalino vale
+  5 PV se in quel paese c'è un proprio Allineamento Politico. Il punteggio in alto resta quello pubblico,
+  senza le agende. L'IA cura soltanto la propria agenda e non conosce quella degli altri.
 - **Regole in breve** (menu e pulsante REGOLE), **diario** della partita (DIARIO), riepiloghi a fine
   Agenda, fine Riunione e fine fase militare, fine partita con il dettaglio dei punti.
 
@@ -56,7 +61,8 @@ Dal menu, **GIOCA ONLINE** (anche dalla versione web). Usa lo stesso progetto Fi
   comunica il codice di 4 lettere. Quando ci sono tutti preme *Inizia online*: i posti liberi li gioca
   l'IA.
 - **Gli amici** scrivono il nome e il codice e premono *Entra*.
-- Ognuno vede soltanto le proprie carte (anche quella giocata coperta nell'Agenda, fino alla rivelazione).
+- Ognuno vede soltanto le proprie carte (anche quella giocata coperta nell'Agenda, fino alla rivelazione)
+  e la propria Agenda segreta, se la variante è attiva (la sceglie chi crea la stanza).
 - Ogni decisione è una mossa numerata nel database (`acts/0`, `acts/1`, …): tutti i dispositivi fanno
   girare lo stesso motore con lo stesso seme e applicano le stesse mosse, quindi la partita è identica
   ovunque. Le potenze dell'IA le gioca il dispositivo di chi ha creato la stanza.
@@ -118,4 +124,6 @@ assets/                      mappa divisa in tavolo e fronti, fogli delle carte,
 - Sfondamento: il secondo spazio deve essere di terra e rispettare le condizioni di Normandia e Manciuria.
 - Il Fronte dell'Estremo Oriente in Corea o in Giappone dà 8 PV all'URSS, non cumulabili.
 - Quando tutti i temi sono catturati, chi ha ancora carte le scarta senza effetto.
-- Variante *Secret Agenda* non inclusa.
+- Agenda segreta: i segnalini si pescano con lo stesso seme della partita (così online coincidono su tutti
+  i dispositivi). In hotseat restano nascosti con la mano, dietro la schermata «passa il dispositivo».
+  L'aggiustamento finale e le soglie dei 20 PV usano il punteggio con le agende, come chiede la regola 10.3.

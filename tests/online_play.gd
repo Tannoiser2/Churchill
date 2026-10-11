@@ -29,6 +29,7 @@ func _run() -> void:
 	menu.seat_mode = [0, 1, 0]
 	menu.speed = 3
 	menu.scenario = sc
+	menu.secret = 1 if OS.get_environment("CH_SECRET") != "" else 0
 	menu._online_panel()
 	menu.on_name.text = "Host" if role == "host" else "Ospite"
 	if role == "host":
@@ -83,5 +84,7 @@ func _run() -> void:
 			await _wait(0.5)
 			print("CHTEST mani nascoste: ", hidden_ok)
 			print("CHTEST impronta ", view.online.n, " | ", e.fingerprint())
+			if e.secret:
+				print("CHTEST agende ", e.agenda_of(0), e.agenda_of(1), e.agenda_of(2), " PV ", e.results.get("raw", []))
 			quit(0)
 			return

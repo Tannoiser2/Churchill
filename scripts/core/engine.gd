@@ -59,6 +59,7 @@ var glob := [-1, -1, -1]          # −1 neutrale, altrimenti potenza sul cui la
 var lead := {"eu": UK, "pa": US}
 var abomb := 0
 var spy := 0
+var secret := false              # variante Agenda segreta (10.0)
 var ab_mod := 0
 var ger_perm := 0
 var jap_perm := 0
@@ -164,6 +165,15 @@ func setup(config: Dictionary) -> void:
 				phil_entered = true
 	if fronts[3]["pos"] >= 1:
 		removed_issues[D.issue_index("warjapan")] = true
+	# Agenda segreta: ognuno pesca a caso tre segnalini (pescati per ultimi, così il resto del seme non cambia)
+	secret = bool(config.get("secret", false))
+	for p in range(3):
+		players[p]["sa"] = []
+	if secret:
+		var pool := range(D.SA_TOKENS.size())
+		_shuffle(pool)
+		for p in range(3):
+			players[p]["sa"] = pool.slice(p * 3, p * 3 + 3)
 	log_lines.clear()
 	game_over = false
 	results = {}
@@ -2050,8 +2060,26 @@ func _advance_front(fi: int) -> void:
 
 # ------------------------------------------------------------------ punteggio
 
+## Paesi dell'Agenda segreta di p (uno per segnalino, con i doppioni).
+func agenda_of(p: int) -> Array:
+	var out := []
+	for t in players[p].get("sa", []):
+		out.append(D.SA_TOKENS[int(t)])
+	return out
+
+
+## Punti dell'Agenda segreta di p con la mappa attuale (5 PV per segnalino con un proprio Allineamento).
+func agenda_vp(p: int) -> int:
+	var v := 0
+	for c in agenda_of(p):
+		if countries[c]["pa"] == p:
+			v += D.SA_VP
+	return v
+
+
 ## Punti vittoria correnti (come se la partita finisse ora), con il dettaglio per voce.
-func compute_vp() -> Array:
+## reveal: aggiunge l'Agenda segreta (solo alla fine, quando i segnalini si scoprono).
+func compute_vp(reveal := false) -> Array:
 	var out := []
 	for p in range(3):
 		out.append({"tot": 0, "rows": []})
@@ -2137,6 +2165,11 @@ func compute_vp() -> Array:
 	else:
 		add.call(USSR, 3, "Gli USA non hanno la Bomba A")
 	add.call(USSR, spy * 3, "Rete di spie del Progetto Manhattan (%d)" % spy)
+	if secret and reveal:
+		for p in range(3):
+			for c in agenda_of(p):
+				if countries[c]["pa"] == p:
+					add.call(p, D.SA_VP, "Agenda segreta: %s" % D.COUNTRIES[c]["n"])
 	return out
 
 
@@ -2147,7 +2180,13 @@ func _dist_japan(fi: int) -> int:
 
 func _final_scoring() -> void:
 	_set_phase("end")
-	var vp := compute_vp()
+	if secret:
+		for p in range(3):
+			var names := []
+			for c in agenda_of(p):
+				names.append(D.COUNTRIES[c]["n"] + (" (allineato)" if countries[c]["pa"] == p else " (no)"))
+			log_msg("Agenda segreta di %s: %s (+%d PV)." % [D.POWERS[p]["leader"], ", ".join(names), agenda_vp(p)])
+	var vp := compute_vp(true)
 	var raw := [vp[0]["tot"], vp[1]["tot"], vp[2]["tot"]]
 	var adj := raw.duplicate()
 	var how := ""
@@ -2195,7 +2234,7 @@ func _final_scoring() -> void:
 			adj[by_score[2]] += 5
 		winner = _final_tie(_top(adj), adj)
 	results = {"vp": vp, "raw": raw, "adj": adj, "winner": winner, "how": how,
-		"germany": germany_surr, "japan": japan_surr}
+		"germany": germany_surr, "japan": japan_surr, "secret": secret}
 	game_over = true
 	log_msg("[b]Fine partita: vince %s.[/b] %s" % [D.POWERS[winner]["leader"], how])
 	changed.emit()

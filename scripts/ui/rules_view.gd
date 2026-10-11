@@ -74,6 +74,7 @@ func _col1() -> String:
 • [b]Asse arreso, scarto oltre 20 PV[/b]: se il primo supera la somma degli altri due vince lui, altrimenti vince il secondo.
 • [b]Asse non arreso[/b]: il primo −5, il secondo −3, l'ultimo +5, poi vince chi ha di più.
 • Parità: USA con la Bomba A, poi URSS sola in Germania, altrimenti Churchill.
+• [b]Variante Agenda segreta[/b]: 3 paesi nascosti a testa, +5 PV per ognuno dove c'è un proprio Allineamento (contano prima di stabilire il vincitore).
 
 """ + _h("1. Agenda") + """Si scopre la carta Conferenza e se ne applicano le cinque fasce. Ognuno riceve 7 carte dello staff (rimescolando nelle conferenze dispari) e ne gioca una coperta: conta solo il valore (+1 al Regno Unito; i Capi di Stato Maggiore tirano 1d6). Chi ha il valore più alto mette un tema sul suo tracciato a tanti spazi dal centro quanta è la differenza con la carta più bassa; poi, da sinistra, ognuno mette due temi al centro.
 Spareggi: a partire da Stalin e verso sinistra un Leader attivo può risolverli; altrimenti vincono gli USA (o decidono loro).

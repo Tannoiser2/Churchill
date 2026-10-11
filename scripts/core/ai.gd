@@ -766,6 +766,15 @@ func risk(e: CHEngine, p: int, c: String) -> float:
 	return 0.0
 
 
+## Quanti segnalini della propria Agenda segreta indicano il paese c (l'IA conosce solo i suoi).
+var sa_blind := false            # solo per i test: ignora la propria agenda
+
+func sa_count(e: CHEngine, p: int, c: String) -> int:
+	if not e.secret or sa_blind:
+		return 0
+	return e.agenda_of(p).count(c)
+
+
 func cn_choice(e: CHEngine, p: int, req: Dictionary) -> int:
 	var opts: Array = req["options"]
 	var best := 0
@@ -793,6 +802,10 @@ func cn_choice(e: CHEngine, p: int, req: Dictionary) -> int:
 			s -= 0.8 * risk(e, p, c)
 			if D.COUNTRIES[c].get("col", false) and p != UK:
 				s += 0.2   # toglie al Regno Unito i 2 PV della colonia libera
+		# Agenda segreta: una rete è il primo passo verso l'Allineamento che vale 5 PV in più per segnalino
+		var na := sa_count(e, p, c)
+		if na > 0 and cc["pa"] != p:
+			s += (0.5 if o["rm"] else 0.9) * float(na) * (1.0 - 0.6 * risk(e, p, c))
 		s += noise() * 0.3
 		if s > bs:
 			bs = s
@@ -809,6 +822,8 @@ func pa_choice(e: CHEngine, p: int, req: Dictionary) -> int:
 		var s := 3.0 - risk(e, p, o["c"]) * 0.3
 		if o["rm"]:
 			s = 2.6 - 1.2 * float(int(o.get("cost", 1)) - 1)
+		else:
+			s += 1.6 * float(sa_count(e, p, o["c"])) * (1.0 - 0.5 * risk(e, p, o["c"]))
 		s += noise() * 0.3
 		if s > bs:
 			bs = s
@@ -826,6 +841,8 @@ func lose_cn(e: CHEngine, p: int, req: Dictionary) -> String:
 			loss = 0.1
 		elif cc["cn"] >= 2:
 			loss = 0.3
+		if cc["pa"] != p:
+			loss += 0.6 * float(sa_count(e, p, c))
 		if loss < bs:
 			bs = loss
 			best = c

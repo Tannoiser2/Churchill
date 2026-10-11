@@ -77,7 +77,7 @@ func _run() -> void:
 		return
 	var sc := int(args[1]) if args.size() > 1 else 1
 	var seats := [{"ai": false, "name": "Stefano"}, {"ai": true, "name": "Roosevelt", "level": 1}, {"ai": mode != "hot", "name": "Stalin", "level": 1}]
-	main.start_game({"seats": seats, "seed": 42, "ai_delay": 0.0, "scenario": sc})
+	main.start_game({"seats": seats, "seed": 42, "ai_delay": 0.0, "scenario": sc, "secret": OS.get_environment("CH_SECRET") != ""})
 	await wait(10)
 	var taken := {}
 	var guard := 0

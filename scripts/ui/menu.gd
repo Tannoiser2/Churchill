@@ -10,6 +10,7 @@ var tiles := {}
 var level := 1
 var speed := 1
 var scenario := 1
+var secret := 0                  # variante Agenda segreta: 0 no, 1 sì
 var msg: Label
 
 
@@ -20,6 +21,7 @@ func _ready() -> void:
 		level = main.menu_state["level"]
 		speed = main.menu_state["speed"]
 		scenario = main.menu_state.get("scenario", 1)
+		secret = main.menu_state.get("secret", 0)
 	var bg := TextureRect.new()
 	bg.texture = UI.tex("res://assets/conference.jpg")
 	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -89,6 +91,8 @@ func _ready() -> void:
 	ov.add_child(_segmented("", ["Facile", "Normale", "Difficile"], level, func(k): level = k, 200))
 	ov.add_child(UI.label("Velocità IA", 28, Color.WHITE, UI.font_bold))
 	ov.add_child(_segmented("", ["Lenta", "Normale", "Veloce", "Istantanea"], speed, func(k): speed = k, 150))
+	ov.add_child(UI.label("Agenda segreta (variante)", 28, Color.WHITE, UI.font_bold))
+	ov.add_child(_segmented("", ["No", "Sì: 3 paesi nascosti, 5 PV l'uno"], secret, func(k): secret = k, 300))
 
 	msg = UI.label("", 26, UI.RED, UI.font_bold)
 	msg.position = Vector2(62, 868)
@@ -128,7 +132,7 @@ func _ready() -> void:
 
 
 func _store() -> void:
-	main.menu_state = {"seat_mode": seat_mode.duplicate(), "level": level, "speed": speed, "scenario": scenario}
+	main.menu_state = {"seat_mode": seat_mode.duplicate(), "level": level, "speed": speed, "scenario": scenario, "secret": secret}
 
 
 func _make_tile(p: int, pos: Vector2) -> void:
@@ -244,7 +248,7 @@ func _config() -> Dictionary:
 	for p in range(3):
 		seats.append({"ai": seat_mode[p] == 1, "name": D.POWERS[p]["leader"], "level": level})
 	var speeds := [1.0, 0.5, 0.15, 0.0]
-	return {"seats": seats, "ai_level": level, "ai_delay": speeds[speed], "scenario": scenario}
+	return {"seats": seats, "ai_level": level, "ai_delay": speeds[speed], "scenario": scenario, "secret": secret == 1}
 
 
 func _on_start() -> void:

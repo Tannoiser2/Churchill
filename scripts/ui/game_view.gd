@@ -760,6 +760,40 @@ func _refresh_hand() -> void:
 		fr2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		fr2.add_theme_stylebox_override("panel", _frame(UI.GOLD, 4))
 		hand_box.add_child(fr2)
+	_agenda_row(p)
+
+
+## Agenda segreta di p sotto la mano (la vede solo chi gioca quella potenza).
+func _agenda_row(p: int) -> void:
+	var e := engine
+	if not e.secret:
+		return
+	var l := UI.label("Agenda segreta:", 20, UI.GOLD, UI.font_bold)
+	l.position = Vector2(12, 196)
+	hand_box.add_child(l)
+	var x := 140.0
+	for t in e.players[p]["sa"]:
+		var idx := int(t)
+		var c: String = D.SA_TOKENS[idx]
+		var mine: bool = e.countries[c]["pa"] == p
+		var tr := UI.icon_rect(UI.agenda_tex(idx, true), Vector2(110, 44))
+		tr.stretch_mode = TextureRect.STRETCH_SCALE
+		tr.position = Vector2(x, 188)
+		tr.mouse_filter = Control.MOUSE_FILTER_STOP
+		var fr := Panel.new()
+		fr.size = tr.size
+		fr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		fr.add_theme_stylebox_override("panel", _frame(Color("#7fd36f") if mine else Color("#000000"), 3 if mine else 1))
+		tr.add_child(fr)
+		var txt := "[b]Agenda segreta: %s[/b]\nA fine partita, prima di stabilire il vincitore, vale %d PV se in %s c'è un tuo Allineamento Politico.\n%s" % [
+			D.COUNTRIES[c]["n"], D.SA_VP, D.COUNTRIES[c]["n"], "Ora l'Allineamento è tuo." if mine else "Per ora non hai l'Allineamento."]
+		tr.mouse_entered.connect(func(): _show_zoom(UI.agenda_tex(idx), txt, Vector2(CRX - 330, 420)))
+		tr.mouse_exited.connect(_hide_zoom)
+		hand_box.add_child(tr)
+		x += 118.0
+	var v := UI.label("(%d PV ora, nascosti agli altri)" % e.agenda_vp(p), 18, UI.MUTED)
+	v.position = Vector2(x + 6, 198)
+	hand_box.add_child(v)
 
 
 func _frame(c: Color, w: int) -> StyleBoxFlat:
@@ -1615,10 +1649,23 @@ func _on_game_end(res: Dictionary) -> void:
 		for row in res["vp"][p]["rows"]:
 			s += "%+d  %s\n" % [row[1], row[0]]
 		s += "\n[b]Totale: %d PV[/b]" % res["raw"][p]
+		if res.get("secret", false):
+			s += "  (Agenda segreta compresa)"
 		if res["adj"][p] != res["raw"][p]:
 			s += "  › [b]%d[/b] dopo l'aggiustamento" % res["adj"][p]
 		r.text = s
 		cv.add_child(r)
+		if res.get("secret", false):
+			var ah := HBoxContainer.new()
+			ah.add_theme_constant_override("separation", 8)
+			cv.add_child(ah)
+			for tk in engine.players[p]["sa"]:
+				var idx := int(tk)
+				var tr := UI.icon_rect(UI.agenda_tex(idx, true), Vector2(140, 56))
+				tr.stretch_mode = TextureRect.STRETCH_SCALE
+				if engine.countries[D.SA_TOKENS[idx]]["pa"] != p:
+					tr.modulate = Color(0.4, 0.4, 0.4)
+				ah.add_child(tr)
 	var bh := HBoxContainer.new()
 	bh.add_theme_constant_override("separation", 12)
 	vb.add_child(bh)
