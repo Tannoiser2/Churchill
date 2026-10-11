@@ -273,7 +273,7 @@ const CONF_CARDS := [
 	 {"t": "no_adv", "who": 2, "x": "Stalin resta a Mosca: non può far avanzare temi (può dibattere)."},
 	 {"t": "prod_loss", "who": [1], "n": 1, "x": "Minacce di Chiang Kai-shek: gli USA perdono 1 Produzione per gli aiuti alla Cina."},
 	 {"t": "res", "f": "med", "n": 1, "x": "Tunisia: una riserva tedesca al Mediterraneo."},
-	 {"t": "partisans", "x": "Attività partigiana: ogni giocatore tira 1d6, con 1-3 ottiene 2 Reti Clandestine, con 4-6 ne ottiene 3, piazzate con la tabella Pol-Mil."}],
+	 {"t": "partisans", "soft": true, "x": "Attività partigiana: ogni giocatore tira 1d6, con 1-3 ottiene 2 Reti Clandestine, con 4-6 ne ottiene 3, piazzate con la tabella Pol-Mil; dove ci sono reti avversarie non se ne piazza nessuna."}],
 	[{"t": "mand", "who": 0, "n": 1, "k": "any", "th": "west", "x": "Preparativi di Bolero: Churchill deve usare 1 Produzione nel Teatro Occidentale."},
 	 {"t": "no_adv", "who": 2, "x": "Stalin resta a Mosca: non può far avanzare temi (può dibattere)."},
 	 {"t": "issue", "id": "do_us", "x": "Stallo dei Capi di Stato Maggiore: l'Offensiva Diretta USA va sul tavolo."},

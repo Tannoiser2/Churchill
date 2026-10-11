@@ -465,7 +465,7 @@ func debate(e: CHEngine, p: int, req: Dictionary) -> Dictionary:
 	# valore della situazione se non dibatto
 	var base_pos: Dictionary = capped(CHEngine.moved(cur, adv, av), adv) if capture else cur
 	var best := {}
-	var bs := 0.35 if level >= 1 else 0.8
+	var bs: float = [0.8, 0.35, 0.6][clampi(level, 0, 2)]
 	var cands := []
 	if not req.get("leader_only", false):
 		for k in range(hand.size()):

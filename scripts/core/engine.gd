@@ -412,7 +412,7 @@ func _apply_conf_card() -> void:
 					var k := 2 if r2 <= 3 else 3
 					log_msg("%s tira %d: %d Reti Clandestine con la tabella Pol-Mil." % [pname(p), r2, k])
 					for j in range(k):
-						_polmil_cn(p, _polmil_roll())
+						_polmil_cn(p, _polmil_roll(), e.get("soft", false))
 				changed.emit()
 				continue
 			"dispute", "exile":
@@ -502,10 +502,12 @@ func _polmil_roll() -> String:
 
 
 ## Rete Clandestina piazzata dalla tabella Pol-Mil (5.12).
-func _polmil_cn(p: int, c: String) -> void:
+func _polmil_cn(p: int, c: String, soft := false) -> void:
 	var cc: Dictionary = countries[c]
 	var nm: String = D.COUNTRIES[c]["n"]
-	if cc["cn_p"] >= 0 and cc["cn_p"] != p:
+	if soft and cc["cn_p"] >= 0 and cc["cn_p"] != p:
+		log_msg("  %s: ci sono reti di %s, nessuna rete piazzata." % [nm, D.POWERS[cc["cn_p"]]["short"]])
+	elif cc["cn_p"] >= 0 and cc["cn_p"] != p:
 		cc["cn"] -= 1
 		log_msg("  %s: %s toglie una Rete di %s." % [nm, D.POWERS[p]["short"], D.POWERS[cc["cn_p"]]["short"]])
 		if cc["cn"] <= 0:

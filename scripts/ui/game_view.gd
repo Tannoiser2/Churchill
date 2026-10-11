@@ -364,6 +364,15 @@ func _toggle_log() -> void:
 func _on_log(t: String) -> void:
 	if log_panel.visible:
 		log_text.append_text("\n" + t)
+	if pending.is_empty() and engine.phase != "end":
+		# cronaca: le ultime righe del diario mentre giocano gli altri
+		_clear_actions()
+		var n := engine.log_lines.size()
+		var lines := []
+		for k in range(maxi(0, n - 4), n):
+			lines.append(engine.log_lines[k])
+		action_msg.text = "[color=#bfb39a]" + "\n".join(lines) + "[/color]"
+		action_box.visible = true
 
 
 # =================================================================== viste
@@ -1195,7 +1204,6 @@ func _provide(r) -> void:
 	sel_card = -1
 	sel_leader = false
 	_clear_actions()
-	action_box.visible = false
 	_hide_zoom()
 	engine.provide_decision(r)
 	refresh()
