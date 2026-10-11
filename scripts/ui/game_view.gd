@@ -373,6 +373,7 @@ func _on_log(t: String) -> void:
 			lines.append(engine.log_lines[k])
 		action_msg.text = "[color=#bfb39a]" + "\n".join(lines) + "[/color]"
 		action_box.visible = true
+		_fit_action.call_deferred()
 
 
 # =================================================================== viste
@@ -711,7 +712,7 @@ func _refresh_hand() -> void:
 	var e := engine
 	var p := _visible_hand()
 	if p < 0:
-		hand_title.text = "Partita fra IA: le carte in mano restano nascoste."
+		hand_title.text = "Le carte in mano restano nascoste." if cover_for >= 0 else "Partita fra IA: le carte in mano restano nascoste."
 		return
 	var hand: Array = e.players[p]["hand"]
 	hand_title.text = "Carte di %s (%d) · passa sopra una carta per leggerla" % [str(e.players[p]["leader"]).capitalize(), hand.size()]
@@ -779,6 +780,8 @@ func _staff_text(p: int, cid: int) -> String:
 func _visible_hand() -> int:
 	if online != null:
 		return online.seat
+	if cover_for >= 0:
+		return -1
 	if humans.is_empty():
 		return -1
 	if not pending.is_empty() and int(pending["seat"]) in humans:
@@ -1073,7 +1076,9 @@ func _on_decision(req: Dictionary) -> void:
 	# hotseat: più umani sullo stesso dispositivo, si passa il dispositivo
 	if online == null and humans.size() > 1 and p != hand_seat and _shows_hand(req):
 		hand_seat = p
+		cover_for = p
 		_cover(p)
+		refresh()
 		return
 	if _shows_hand(req):
 		hand_seat = p
@@ -1089,6 +1094,7 @@ func _cover(p: int) -> void:
 	vb.add_child(UI.label("Passa il dispositivo: le carte in mano sono nascoste.", 22))
 	var b := UI.primary(UI.button("SONO %s, MOSTRA LE CARTE" % str(engine.players[p]["name"]).to_upper(), 600, 64, 24))
 	b.pressed.connect(func():
+		cover_for = -1
 		_clear_modal()
 		_show_decision())
 	vb.add_child(b)
@@ -1177,6 +1183,7 @@ func _show_decision() -> void:
 		"cn", "pa":
 			_cnpa_ui()
 	refresh()
+	_fit_action.call_deferred()
 
 
 func _add_btn(text: String, cb: Callable, primary := false, fs := 20) -> Button:
@@ -1195,6 +1202,15 @@ func _clear_actions() -> void:
 	for c in action_row.get_children():
 		c.queue_free()
 	action_msg.text = ""
+	_fit_action.call_deferred()
+
+
+## Riporta il riquadro delle azioni alla sua misura (i contenitori crescono ma non si restringono da soli).
+func _fit_action() -> void:
+	action_box.size = action_box.custom_minimum_size
+	await get_tree().process_frame
+	if is_instance_valid(action_box):
+		action_box.size = action_box.custom_minimum_size
 
 
 func _provide(r) -> void:

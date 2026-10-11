@@ -76,7 +76,7 @@ func _run() -> void:
 		quit()
 		return
 	var sc := int(args[1]) if args.size() > 1 else 1
-	var seats := [{"ai": false, "name": "Stefano"}, {"ai": true, "name": "Roosevelt", "level": 1}, {"ai": true, "name": "Stalin", "level": 1}]
+	var seats := [{"ai": false, "name": "Stefano"}, {"ai": true, "name": "Roosevelt", "level": 1}, {"ai": mode != "hot", "name": "Stalin", "level": 1}]
 	main.start_game({"seats": seats, "seed": 42, "ai_delay": 0.0, "scenario": sc})
 	await wait(10)
 	var taken := {}
@@ -103,6 +103,15 @@ func _run() -> void:
 				g._clear_modal()
 				g.engine.provide_decision(true)
 			continue
+		if g.modal.get_child_count() > 0 and g.cover_for >= 0:
+			# schermata «passa il dispositivo» (più umani sullo stesso dispositivo)
+			if not taken.has("cover"):
+				taken["cover"] = true
+				await shot("passa_dispositivo")
+			g.cover_for = -1
+			g._clear_modal()
+			g._show_decision()
+			await wait(2)
 		var key := "%s_%d" % [req["type"], g.engine.conf_no]
 		if not taken.has(key) and (g.engine.conf_i == 0 or req["type"] in ["cn", "pa", "alloc", "place_do"]) and taken.size() < 40:
 			taken[key] = true
