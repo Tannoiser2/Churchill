@@ -2,7 +2,8 @@
 
 Versione digitale per uso personale di **Churchill: Big Three Struggle for Peace** di Mark Herman
 (GMT Games, 2ª edizione con l'errata del settembre 2015). Mappa, carte e regole © dei rispettivi autori:
-le immagini vengono dal modulo Tabletop Simulator e non vanno distribuite pubblicamente.
+le immagini vengono dal modulo Tabletop Simulator e, per le carte (staff, leader, Conferenza e retri),
+dalle scansioni dell'edizione italiana; non vanno distribuite pubblicamente.
 
 **Gioca nel browser:** https://tannoiser2.github.io/Churchill/
 
@@ -92,7 +93,8 @@ scripts/ui/                  menu, vista di gioco (tavolo e mappa), regole
 tests/sim.gd                 godot --headless -s res://tests/sim.gd -- 20 1 1 1 1   (partite IA contro IA: partite, scenario, livelli)
 tests/shot.gd                xvfb-run godot -s res://tests/shot.gd -- game 1         (screenshot, partita intera dall'interfaccia)
 tests/online_play.gd         prova online con tests/firebase_mock.py
-assets/                      mappa divisa in tavolo e fronti, fogli delle carte, gettoni dei temi (dal modulo TTS), font OFL
+assets/                      mappa divisa in tavolo e fronti, gettoni dei temi (dal modulo TTS), fogli delle carte
+                             (scansioni dell'edizione italiana), font OFL
 ```
 
 ## Scelte da verificare
