@@ -2,8 +2,9 @@
 
 Versione digitale per uso personale di **Churchill: Big Three Struggle for Peace** di Mark Herman
 (GMT Games, 2ª edizione con l'errata del settembre 2015). Mappa, carte e regole © dei rispettivi autori:
-le immagini vengono dal modulo Tabletop Simulator e, per le carte (staff, leader, Conferenza e retri),
-dalle scansioni dell'edizione italiana; non vanno distribuite pubblicamente.
+le immagini vengono dalle scansioni dell'edizione italiana (carte staff, leader, Conferenza e retri,
+tavolo della Conferenza e mappa militare, ricomposti dalle 8 pagine scansionate) e dal modulo
+Tabletop Simulator; non vanno distribuite pubblicamente.
 
 **Gioca nel browser:** https://tannoiser2.github.io/Churchill/
 
