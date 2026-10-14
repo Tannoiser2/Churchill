@@ -892,9 +892,9 @@ func _refresh_mil() -> void:
 		var pos := _mpos(c)
 		m.anchors["c:" + c] = pos
 		for k in range(cc["cn"]):
-			m.cn_disc(pos + Vector2(-46 + k * 46, 30), UI.pcol(cc["cn_p"]))
+			m.cn_disc(pos + Vector2(-36 + k * 40, 26), UI.pcol(cc["cn_p"]))
 		if cc["pa"] >= 0:
-			m.pa_pawn(pos + Vector2(58, -14), UI.pcol(cc["pa"]))
+			m.pa_pawn(pos + Vector2(44, -6), UI.pcol(cc["pa"]))
 	# riquadri: supporti navali
 	for b in D.BOXES:
 		var pos2 := _mpos("box:" + b)

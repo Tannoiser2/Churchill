@@ -312,7 +312,6 @@ func front_block(fi: int, px: Vector2, label: String) -> void:
 		world.add_child(b)
 		var tex: String = {"west": "gJ5MHWn", "med": "mXunuFJ", "east": "ZCWT568", "fe": "TZcULTQ", "cbi": "mXunuFJ", "cp": "RQR8hlb", "swp": "RQR8hlb"}[D.FRONTS[fi]["id"]]
 		var m := _mi(mesh("block"), tex_mat("res://assets/pieces/blk_%s.jpg" % tex, 0.7), Vector3.ZERO, 0.28, b)
-		m.rotation_degrees = Vector3(-8, 0, 0)
 		var l := Label3D.new()
 		l.text = label
 		l.font_size = 64
@@ -339,28 +338,89 @@ func clear_pieces() -> void:
 		c.queue_free()
 
 
-## Pila di gettoni dei supporti (offensivi o navali), i gettoni a due facce del gioco:
-## sul retro c'è il valore multiplo (×3 navali, ×2 offensivi), usato per le pile grandi.
+## Gettone di cartone spesso con gli angoli arrotondati: faccia superiore con l'immagine, bordo in tinta.
+func chit_mesh(face: String, edge: Color, sz: float, th := 0.075) -> ArrayMesh:
+	var key := "chit:%s:%f" % [face, sz]
+	if _mesh.has(key):
+		return _mesh[key]
+	var r := sz * 0.14
+	var hs := sz / 2.0
+	var outline := PackedVector2Array()
+	var seg := 5
+	for c in range(4):
+		var cx := hs - r if c in [0, 3] else -hs + r
+		var cz := hs - r if c in [0, 1] else -hs + r
+		var a0 := c * PI / 2.0
+		for i in range(seg + 1):
+			var a := a0 + (PI / 2.0) * i / seg
+			outline.append(Vector2(cx + cos(a) * r, cz + sin(a) * r))
+	var am := ArrayMesh.new()
+	# faccia superiore (ventaglio dal centro)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n := outline.size()
+	for i in range(n):
+		var p0 := outline[i]
+		var p1 := outline[(i + 1) % n]
+		for p in [Vector2.ZERO, p0, p1]:
+			st.set_normal(Vector3.UP)
+			st.set_uv(Vector2(p.x / sz + 0.5, p.y / sz + 0.5))
+			st.add_vertex(Vector3(p.x, th / 2.0, p.y))
+	st.commit(am)
+	var top := StandardMaterial3D.new()
+	top.albedo_texture = load(face if face.begins_with("res://") else "res://assets/pieces/%s.jpg" % face)
+	top.roughness = 0.7
+	am.surface_set_material(0, top)
+	# bordo e fondo
+	var st2 := SurfaceTool.new()
+	st2.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in range(n):
+		var p0 := outline[i]
+		var p1 := outline[(i + 1) % n]
+		var nn := Vector3((p0.x + p1.x) / 2.0, 0, (p0.y + p1.y) / 2.0).normalized()
+		var a := Vector3(p0.x, th / 2.0, p0.y)
+		var b := Vector3(p1.x, th / 2.0, p1.y)
+		var c2 := Vector3(p1.x, -th / 2.0, p1.y)
+		var d := Vector3(p0.x, -th / 2.0, p0.y)
+		for v in [a, b, c2, a, c2, d]:
+			st2.set_normal(nn)
+			st2.add_vertex(v)
+		for v in [Vector3(0, -th / 2.0, 0), Vector3(p1.x, -th / 2.0, p1.y), Vector3(p0.x, -th / 2.0, p0.y)]:
+			st2.set_normal(Vector3.DOWN)
+			st2.add_vertex(v)
+	st2.commit(am)
+	var side := StandardMaterial3D.new()
+	side.albedo_color = edge
+	side.roughness = 0.85
+	am.surface_set_material(1, side)
+	_mesh[key] = am
+	return am
+
+
+## Pila di gettoni dei supporti (offensivi o navali), allineata alla mappa:
+## per le pile grandi si usa il retro con il valore multiplo (×3 navali, ×2 offensivi), come al tavolo.
 func chips(px: Vector2, n: int, img: String, sz := 0.5) -> void:
-	var multi := 3 if img == "naval" else 2
+	var naval := img == "naval"
+	var multi := 3 if naval else 2
 	var big := n / multi
 	var small := n % multi
-	var mat := tex_mat("res://assets/pieces/chit_%s.jpg" % ("naval" if img == "naval" else "off"), 0.75)
-	var k := 0
+	var nm := "naval" if naval else "off"
+	var edge := Color("#0a4f86") if naval else Color("#a8987c")
+	var th := 0.075
 	for i in range(big + small):
-		var flip := i < big
-		var mi := _mi(mesh("chit"), mat, w(px + Vector2(k % 2 * 5, -k * 3), 0.026 + k * 0.034), sz / 0.67)
-		mi.rotation_degrees = Vector3(180 if flip == CHIT_FRONT_DOWN else 0, (k * 7) % 11 - 5 + (0 if flip else 180), 0)
-		k += 1
+		var face := ("chitb_" if i >= small else "chitf_") + nm
+		var mi := MeshInstance3D.new()
+		mi.mesh = chit_mesh(face, edge, sz, th)
+		mi.position = w(px, th / 2.0 + 0.004 + i * (th + 0.006))
+		pieces.add_child(mi)
 
 
 ## Cubetti di legno (armate dell'Asse).
 func cubes(px: Vector2, n: int, c: Color) -> void:
 	for k in range(n):
-		var p := px + Vector2((k % 3) * 17 - 17, (k / 3) * 17)
+		var p := px + Vector2((k % 3) * 20 - 20, (k / 3) * 20)
 		var mi := _mi(BoxMesh.new(), col_mat(c, 0.7), w(p, 0.075), 1.0)
 		(mi.mesh as BoxMesh).size = Vector3(0.15, 0.15, 0.15)
-		mi.rotation_degrees.y = (k * 13) % 20 - 10
 
 
 func cn_disc(px: Vector2, c: Color) -> void:
@@ -380,26 +440,19 @@ func cmd_block(px: Vector2, c: Color, txt: String) -> void:
 	n.position = w(px, 0.25)
 	pieces.add_child(n)
 	var m := _mi(mesh("block"), col_mat(c, 0.7), Vector3.ZERO, 0.25, n)
-	m.rotation_degrees = Vector3(-8, 0, 0)
 	var l := Label3D.new()
 	l.text = txt
 	l.font_size = 56
 	l.pixel_size = 0.0035
 	l.outline_size = 12
 	l.position = Vector3(0, 0, 0.14)
-	l.rotation_degrees = Vector3(-8, 0, 0)
 	n.add_child(l)
 
 
 func issue_chit(px: Vector2, tex: Texture2D) -> void:
 	var mi := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.42, 0.04, 0.42)
-	mi.mesh = bm
-	var m := StandardMaterial3D.new()
-	m.albedo_texture = tex
-	mi.material_override = m
-	mi.position = w(px, 0.03)
+	mi.mesh = chit_mesh(tex.resource_path, Color("#2a2620"), 0.46, 0.06)
+	mi.position = w(px, 0.034)
 	pieces.add_child(mi)
 
 
@@ -519,9 +572,8 @@ func roll_die(sides: int, value: int, px: Vector2, col := Color("#7a1616")) -> v
 	var final := Quaternion(Vector3.UP, randf() * TAU) * Quaternion(nrm.normalized(), Vector3.UP)
 	var axis := Vector3(randf() - 0.5, randf() * 0.4, randf() - 0.5).normalized()
 	var spins := TAU * 3.0
-	var rest_h := 0.25 * 1.6
-	if sides == 10:
-		rest_h = _rest_height(faces[value], die) * 1.6
+	var hull := _hull(die)
+	var rest_h := _lift(hull, final)
 	var dur := 1.1
 	var tw := die.create_tween()
 	tw.tween_method(func(t: float):
@@ -530,10 +582,12 @@ func roll_die(sides: int, value: int, px: Vector2, col := Color("#7a1616")) -> v
 		# traiettoria: arco e due rimbalzi
 		var p := start.lerp(land, min(1.0, t * 1.15))
 		var bounce: float = abs(sin(t * PI * 2.6)) * (1.0 - t) * 1.4
-		p.y = rest_h + bounce + max(0.0, 1.0 - t * 3.0) * 1.6
-		die.position = p
 		var spin := Quaternion(axis, spins * pow(1.0 - t, 2.0))
-		die.quaternion = spin * final, 0.0, 1.0, dur)
+		var q := spin * final
+		# mai sotto il tabellone: il punto più basso del dado, ruotato, resta appoggiato sopra
+		p.y = _lift(hull, q) + bounce + max(0.0, 1.0 - t * 3.0) * 1.6
+		die.position = p
+		die.quaternion = q, 0.0, 1.0, dur)
 	tw.tween_callback(func():
 		if is_instance_valid(die):
 			die.position = Vector3(land.x, rest_h, land.z)
@@ -541,16 +595,23 @@ func roll_die(sides: int, value: int, px: Vector2, col := Color("#7a1616")) -> v
 	await get_tree().create_timer(dur + 0.25).timeout
 
 
-func _rest_height(nrm: Vector3, die: Node3D) -> float:
-	# distanza della faccia dal centro: il dado poggia sulla faccia opposta a quella in alto
-	var best := 0.0
+## Vertici del dado (in scala) per sapere quanto sollevarlo.
+func _hull(die: Node3D) -> PackedVector3Array:
+	var out := PackedVector3Array()
 	for c in die.get_children():
 		if c is MeshInstance3D:
 			var arr: Array = (c as MeshInstance3D).mesh.surface_get_arrays(0)
-			var verts: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
-			for v in verts:
-				best = max(best, v.dot(nrm.normalized()))
-	return best
+			for v in (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array):
+				out.append(v * die.scale.x)
+	return out
+
+
+## Altezza del centro perché il vertice più basso, con la rotazione q, tocchi il tabellone.
+func _lift(hull: PackedVector3Array, q: Quaternion) -> float:
+	var low := 0.0
+	for v in hull:
+		low = min(low, (q * v).y)
+	return -low + 0.002
 
 
 func clear_dice() -> void:
