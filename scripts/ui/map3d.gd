@@ -8,6 +8,7 @@ const D = preload("res://scripts/data/ch_data.gd")
 const S := 0.01                     # unità 3D per pixel della mappa (1760 × 2100)
 const BW := 17.6
 const BD := 21.0
+const CHIT_FRONT_DOWN := false   # la faccia ×N è quella in basso nel modello
 
 signal picked(key: String)
 
@@ -94,9 +95,9 @@ func setup(sz: Vector2) -> void:
 	pm.size = Vector2(BW, BD)
 	top.mesh = pm
 	var mm := StandardMaterial3D.new()
-	mm.albedo_texture = load("res://assets/military.jpg")
-	mm.roughness = 1.0
-	mm.metallic_specular = 0.05
+	mm.albedo_texture = load("res://assets/pieces/board_mil.jpg")
+	mm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mm.albedo_color = Color(0.93, 0.92, 0.9)
 	mm.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	top.material_override = mm
 	top.position.y = 0.001
@@ -338,18 +339,19 @@ func clear_pieces() -> void:
 		c.queue_free()
 
 
-## Pila di gettoni quadrati (supporti offensivi o navali).
-func chips(px: Vector2, n: int, img: String, sz := 0.42) -> void:
-	for k in range(n):
-		var mi := MeshInstance3D.new()
-		var bm := BoxMesh.new()
-		bm.size = Vector3(sz, 0.05, sz)
-		mi.mesh = bm
-		var top := tex_mat("res://assets/pieces/%s.png" % img, 0.8)
-		mi.material_override = top
-		mi.position = w(px + Vector2(k % 3 * 6, -k * 4), 0.03 + k * 0.055)
-		mi.rotation_degrees.y = (k * 7) % 11 - 5
-		pieces.add_child(mi)
+## Pila di gettoni dei supporti (offensivi o navali), i gettoni a due facce del gioco:
+## sul retro c'è il valore multiplo (×3 navali, ×2 offensivi), usato per le pile grandi.
+func chips(px: Vector2, n: int, img: String, sz := 0.5) -> void:
+	var multi := 3 if img == "naval" else 2
+	var big := n / multi
+	var small := n % multi
+	var mat := tex_mat("res://assets/pieces/chit_%s.jpg" % ("naval" if img == "naval" else "off"), 0.75)
+	var k := 0
+	for i in range(big + small):
+		var flip := i < big
+		var mi := _mi(mesh("chit"), mat, w(px + Vector2(k % 2 * 5, -k * 3), 0.026 + k * 0.034), sz / 0.67)
+		mi.rotation_degrees = Vector3(180 if flip == CHIT_FRONT_DOWN else 0, (k * 7) % 11 - 5 + (0 if flip else 180), 0)
+		k += 1
 
 
 ## Cubetti di legno (armate dell'Asse).
@@ -362,11 +364,11 @@ func cubes(px: Vector2, n: int, c: Color) -> void:
 
 
 func cn_disc(px: Vector2, c: Color) -> void:
-	_mi(mesh("cn"), col_mat(c.lightened(0.15), 0.15, 0.85), w(px, 0.02), 0.14)
+	_mi(mesh("cn"), col_mat(c.lightened(0.15), 0.15, 0.85), w(px, 0.035), 0.25)
 
 
 func pa_pawn(px: Vector2, c: Color) -> void:
-	_mi(mesh("pa"), col_mat(c, 0.6), w(px, 0.11), 0.16)
+	_mi(mesh("pa"), col_mat(c, 0.6), w(px, 0.2), 0.33)
 
 
 func pawn(px: Vector2, c: Color) -> void:

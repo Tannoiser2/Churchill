@@ -892,15 +892,15 @@ func _refresh_mil() -> void:
 		var pos := _mpos(c)
 		m.anchors["c:" + c] = pos
 		for k in range(cc["cn"]):
-			m.cn_disc(pos + Vector2(-44 + k * 44, 28), UI.pcol(cc["cn_p"]))
+			m.cn_disc(pos + Vector2(-46 + k * 46, 30), UI.pcol(cc["cn_p"]))
 		if cc["pa"] >= 0:
-			m.pa_pawn(pos + Vector2(52, -12), UI.pcol(cc["pa"]))
+			m.pa_pawn(pos + Vector2(58, -14), UI.pcol(cc["pa"]))
 	# riquadri: supporti navali
 	for b in D.BOXES:
 		var pos2 := _mpos("box:" + b)
 		m.anchors["b:" + b] = pos2
 		if e.naval[b] > 0:
-			m.chips(pos2 + Vector2(-60, 44), e.naval[b], "naval", 0.5)
+			m.chips(pos2 + Vector2(-60, 44), e.naval[b], "naval")
 	# fronti: blocchetti, supporti, riserve dell'Asse, offensive dirette
 	var at_space := {}
 	for fi in range(e.fronts.size()):
@@ -918,7 +918,7 @@ func _refresh_mil() -> void:
 		var ep := _entry_px(fi)
 		m.anchors["f:%d" % fi] = ep
 		if f["off"] > 0:
-			m.chips(ep + Vector2(-68, -20), f["off"], "offsup", 0.52)
+			m.chips(ep + Vector2(-68, -20), f["off"], "offsup")
 		if f["res"] > 0 and e.phase in ["war", "agenda", "meeting", "decision"]:
 			m.cubes(ep + Vector2(52, 28), f["res"], Color("#2b2b2b") if D.FRONTS[fi]["th"] == "eu" else Color("#c8641f"))
 		for j in range(f["do"].size()):
