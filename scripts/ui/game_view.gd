@@ -8,9 +8,9 @@ const TOP_H := 64.0
 const CONF_RECT := Rect2(10, 72, 980, 936)
 const CRX := 1004.0
 const CRW := 906.0
-const MIL_RECT := Rect2(10, 72, 838, 1000)
-const MRX := 862.0
-const MRW := 1048.0
+const MIL_RECT := Rect2(10, 72, 1040, 1000)
+const MRX := 1062.0
+const MRW := 848.0
 const SHORT := {"west": "OCC", "med": "MED", "east": "EST", "fe": "E.OR", "cbi": "CBI", "cp": "P.C.", "swp": "PSO"}
 
 var main
@@ -34,7 +34,10 @@ var btn_view: Button
 var conf_view: Control
 var conf_layer: Control
 var mil_view: Control
-var mil_layer: Control
+var map3d: Map3D
+var step_skip := false
+var step_waiting := false
+var step_box: PanelContainer
 var conf_card_box: Control
 var conf_card_tex: TextureRect
 var conf_card_txt: RichTextLabel
@@ -46,6 +49,7 @@ var mil_info: RichTextLabel
 var action_box: PanelContainer
 var action_msg: RichTextLabel
 var action_row: HFlowContainer
+var issue_row: HFlowContainer
 var modal: Control
 var toast: Control
 var zoom: Control
@@ -108,6 +112,7 @@ func _ready() -> void:
 	engine.phase_changed.connect(_on_phase)
 	engine.game_ended.connect(_on_game_end)
 	engine.fx.connect(_on_fx)
+	engine.step_requested.connect(_on_step)
 	_set_view("conf")
 	refresh()
 	if online != null and online.catchup:
@@ -222,34 +227,31 @@ func _build_conf_view() -> void:
 	conf_layer.size = CONF_RECT.size
 	conf_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	conf_view.add_child(conf_layer)
-	# carta Conferenza
-	conf_card_box = _panel(Rect2(CRX, 72, CRW, 300))
+	# carta Conferenza (più grande; il testo è già sulla carta, al passaggio del mouse c'è l'ingrandimento)
+	conf_card_box = _panel(Rect2(CRX, 72, 268, 368))
 	conf_view.add_child(conf_card_box)
 	conf_card_tex = TextureRect.new()
 	conf_card_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	conf_card_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
-	conf_card_tex.position = Vector2(8, 8)
-	conf_card_tex.size = Vector2(203, 284)
+	conf_card_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	conf_card_tex.position = Vector2(9, 9)
+	conf_card_tex.size = Vector2(250, 350)
 	conf_card_tex.mouse_filter = Control.MOUSE_FILTER_STOP
 	conf_card_tex.mouse_entered.connect(func(): _show_zoom(conf_card_tex.texture, _conf_card_text(), Vector2(CRX - 330, 80)))
 	conf_card_tex.mouse_exited.connect(_hide_zoom)
 	conf_card_box.add_child(conf_card_tex)
-	var sc := ScrollContainer.new()
-	sc.position = Vector2(222, 8)
-	sc.size = Vector2(CRW - 232, 284)
-	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	conf_card_box.add_child(sc)
-	conf_card_txt = UI.rich(18)
-	conf_card_txt.custom_minimum_size = Vector2(CRW - 248, 0)
-	sc.add_child(conf_card_txt)
-	# giocatori
+	conf_card_txt = UI.rich(19)
+	conf_card_txt.position = Vector2(CRX + 280, 74)
+	conf_card_txt.custom_minimum_size = Vector2(CRW - 284, 0)
+	conf_card_txt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	conf_view.add_child(conf_card_txt)
+	# i tre leader accanto alla carta
 	player_rows = VBoxContainer.new()
-	player_rows.position = Vector2(CRX, 380)
-	player_rows.size = Vector2(CRW, 250)
+	player_rows.position = Vector2(CRX + 276, 104)
+	player_rows.size = Vector2(CRW - 276, 336)
 	player_rows.add_theme_constant_override("separation", 6)
 	conf_view.add_child(player_rows)
 	# mano
-	hand_box = _panel(Rect2(CRX, 834, CRW, 238))
+	hand_box = _panel(Rect2(CRX, 658, CRW, 414))
 	conf_view.add_child(hand_box)
 	hand_title = UI.label("", 19, UI.MUTED, UI.font_bold)
 	hand_title.position = Vector2(12, 4)
@@ -263,19 +265,21 @@ func _build_mil_view() -> void:
 	add_child(mil_view)
 	var fr := _panel(Rect2(MIL_RECT.position - Vector2(4, 4), MIL_RECT.size + Vector2(8, 8)), Color("#000000"), Color("#5a4a2a"))
 	mil_view.add_child(fr)
-	var img := TextureRect.new()
-	img.texture = UI.tex("res://assets/military.jpg")
-	img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	img.stretch_mode = TextureRect.STRETCH_SCALE
-	img.position = MIL_RECT.position
-	img.size = MIL_RECT.size
-	img.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	mil_view.add_child(img)
-	mil_layer = Control.new()
-	mil_layer.position = MIL_RECT.position
-	mil_layer.size = MIL_RECT.size
-	mil_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	mil_view.add_child(mil_layer)
+	map3d = Map3D.new()
+	map3d.position = MIL_RECT.position
+	map3d.setup(MIL_RECT.size)
+	map3d.tip_fn = _map_tip
+	mil_view.add_child(map3d)
+	var hint := UI.label("Trascina: sposta · tasto destro: ruota · rotellina: zoom", 15, Color("#d8cdb4"))
+	hint.position = MIL_RECT.position + Vector2(10, MIL_RECT.size.y - 26)
+	hint.add_theme_color_override("font_outline_color", Color.BLACK)
+	hint.add_theme_constant_override("outline_size", 5)
+	mil_view.add_child(hint)
+	var home := UI.button("⌂", 44, 40, 20)
+	home.position = MIL_RECT.position + Vector2(MIL_RECT.size.x - 54, 10)
+	home.tooltip_text = "Rimetti la mappa intera"
+	home.pressed.connect(func(): map3d.reset_view())
+	mil_view.add_child(home)
 	var rp := _panel(Rect2(MRX, 72, MRW, 560))
 	mil_view.add_child(rp)
 	var tt := UI.title("I FRONTI", 26)
@@ -307,6 +311,10 @@ func _build_action() -> void:
 	action_box.add_child(vb)
 	action_msg = UI.rich(20)
 	vb.add_child(action_msg)
+	issue_row = HFlowContainer.new()
+	issue_row.add_theme_constant_override("h_separation", 6)
+	issue_row.add_theme_constant_override("v_separation", 6)
+	vb.add_child(issue_row)
 	action_row = HFlowContainer.new()
 	action_row.add_theme_constant_override("h_separation", 8)
 	action_row.add_theme_constant_override("v_separation", 6)
@@ -316,9 +324,9 @@ func _build_action() -> void:
 
 func _layout_action() -> void:
 	if view == "conf":
-		action_box.position = Vector2(CRX, 640)
-		action_box.custom_minimum_size = Vector2(CRW, 186)
-		action_box.size = Vector2(CRW, 186)
+		action_box.position = Vector2(CRX, 448)
+		action_box.custom_minimum_size = Vector2(CRW, 202)
+		action_box.size = Vector2(CRW, 202)
 		action_msg.custom_minimum_size = Vector2(CRW - 24, 0)
 	else:
 		action_box.position = Vector2(MRX, 874)
@@ -650,30 +658,36 @@ func _refresh_conf_card() -> void:
 		conf_card_txt.text = ""
 		return
 	conf_card_tex.texture = UI.conf_tex(e.card)
-	conf_card_txt.text = "[font_size=22][color=#d9b45a][b]%d · %s %s[/b][/color][/font_size]  [i]%s[/i]\n%s" % [e.conf_no, D.CONF_NAMES[e.conf_no], D.conf_variant(e.card), D.CONF_DATES[e.conf_no], _conf_card_text()]
+	conf_card_txt.text = "[font_size=22][color=#d9b45a][b]Conferenza %d · %s %s[/b][/color][/font_size]  [i]%s[/i]" % [e.conf_no, D.CONF_NAMES[e.conf_no], D.conf_variant(e.card), D.CONF_DATES[e.conf_no]]
 
 
 func _refresh_players() -> void:
 	var e := engine
+	var rw := CRW - 276.0
 	for c in player_rows.get_children():
 		c.queue_free()
 	for p in [0, 2, 1]:
 		var pl: Dictionary = e.players[p]
 		var row := Panel.new()
-		row.custom_minimum_size = Vector2(CRW, 78)
+		row.custom_minimum_size = Vector2(rw, 108)
 		var active: bool = e.current == p and not pending.is_empty() and int(pending.get("seat", -1)) == p
 		row.add_theme_stylebox_override("panel", UI.panel_style(Color("#1d1811ee") if not active else Color("#3a2e14ee"), UI.pcol(p), 3 if active else 1, 6))
 		player_rows.add_child(row)
-		var por := UI.icon_rect(UI.portrait(pl["leader"]), Vector2(80, 70))
-		por.position = Vector2(4, 4)
+		var por := UI.icon_rect(UI.portrait(pl["leader"]), Vector2(86, 98))
+		por.position = Vector2(5, 5)
 		if not e.leader_active(p):
 			por.modulate = Color(0.45, 0.45, 0.45)
 		row.add_child(por)
-		var nm := UI.label("%s · %s" % [str(pl["leader"]).capitalize(), pl["name"]] if pl["name"] != str(pl["leader"]).capitalize() else str(pl["leader"]).capitalize(), 22, D.POWERS[p]["light"], UI.font_bold)
-		nm.position = Vector2(92, 2)
+		var nm := UI.label("%s · %s" % [str(pl["leader"]).capitalize(), pl["name"]] if pl["name"] != str(pl["leader"]).capitalize() else str(pl["leader"]).capitalize(), 23, D.POWERS[p]["light"], UI.font_bold)
+		nm.position = Vector2(100, 2)
 		row.add_child(nm)
+		var lead := UI.label("ATTIVO" if e.leader_active(p) else "INATTIVO", 15, Color.WHITE, UI.font_bold)
+		var lp := PanelContainer.new()
+		lp.add_theme_stylebox_override("panel", UI.panel_style(Color("#1d6b2c") if e.leader_active(p) else Color("#5a1f17"), Color("#f0e0b0"), 1, 4))
+		lp.add_child(lead)
+		lp.position = Vector2(rw - 96, 6)
+		row.add_child(lp)
 		var info := []
-		info.append("Leader %s" % ("attivo" if e.leader_active(p) else "inattivo"))
 		info.append("%d carte in mano" % pl["hand"].size())
 		if e.phase == "meeting":
 			info.append("temi sul suo lato: %d" % _count_track(p))
@@ -686,22 +700,23 @@ func _refresh_players() -> void:
 		if pl["heart"]:
 			info.append("infarto")
 		var il := UI.label(" · ".join(info), 19, Color("#e0d8c8"))
-		il.position = Vector2(92, 30)
+		il.position = Vector2(100, 34)
+		il.size = Vector2(rw - 110, 26)
 		row.add_child(il)
-		var il2 := UI.label("Produzione %d · Reti da piazzare %d · Allineamenti %d · tecnologie %d · morti %d" % [pl["prod"], pl["cn_gain"], pl["pa_gain"], pl["tech"], pl["dead"].size()], 16, UI.MUTED)
-		il2.position = Vector2(92, 54)
+		var il2 := UI.label("Produzione %d · Reti da piazzare %d · Allineamenti %d\ntecnologie %d · morti %d" % [pl["prod"], pl["cn_gain"], pl["pa_gain"], pl["tech"], pl["dead"].size()], 16, UI.MUTED)
+		il2.position = Vector2(100, 60)
 		row.add_child(il2)
 		# carta giocata nell'Agenda
 		if e.agenda_play.has(p) and e.phase == "agenda":
 			var ap: Dictionary = e.agenda_play[p]
 			var show: bool = e.step != "agenda_card" or p in humans and (online != null or humans.size() == 1)
 			var t: Texture2D = UI.staff_tex(p, ap["card"]) if show else UI.back_tex(p)
-			var cr := UI.icon_rect(t, Vector2(52, 73))
-			cr.position = Vector2(CRW - 120, 3)
+			var cr := UI.icon_rect(t, Vector2(66, 92))
+			cr.position = Vector2(rw - 220, 8)
 			row.add_child(cr)
 			if e.step != "agenda_card":
 				var vl := UI.label(str(ap["v"]), 30, UI.GOLD, UI.font_title)
-				vl.position = Vector2(CRW - 60, 18)
+				vl.position = Vector2(rw - 146, 40)
 				row.add_child(vl)
 
 
@@ -717,13 +732,14 @@ func _refresh_hand() -> void:
 	var hand: Array = e.players[p]["hand"]
 	hand_title.text = "Carte di %s (%d) · passa sopra una carta per leggerla" % [str(e.players[p]["leader"]).capitalize(), hand.size()]
 	var clickable := _hand_clickable()
-	var cw := 106.0
-	var ch := 148.0
+	var cw := 131.0
+	var ch := 184.0
 	for k in range(hand.size()):
 		var cid: int = hand[k]
-		var x := 10.0 + k * (cw + 6)
+		var x := 10.0 + (k % 4) * (cw + 8)
+		var y := 40.0 + (k / 4) * (ch + 8)
 		var c := Control.new()
-		c.position = Vector2(x, 34 - (14 if k == sel_card else 0))
+		c.position = Vector2(x, y - (12 if k == sel_card else 0))
 		c.size = Vector2(cw, ch)
 		c.mouse_filter = Control.MOUSE_FILTER_STOP
 		var tr := UI.icon_rect(UI.staff_tex(p, cid), Vector2(cw, ch))
@@ -743,9 +759,9 @@ func _refresh_hand() -> void:
 					_on_card_click(k))
 		hand_box.add_child(c)
 	# Leader
-	var lx := 10.0 + 7 * (cw + 6) + 6
+	var lx := 10.0 + 4 * (cw + 8) + 16
 	var lc := UI.icon_rect(UI.leader_tex(e.players[p]["leader"]), Vector2(CRW - lx - 10, ch))
-	lc.position = Vector2(lx, 34)
+	lc.position = Vector2(lx, 40)
 	lc.mouse_filter = Control.MOUSE_FILTER_STOP
 	if not e.leader_active(p):
 		lc.modulate = Color(0.4, 0.4, 0.4)
@@ -768,17 +784,19 @@ func _agenda_row(p: int) -> void:
 	var e := engine
 	if not e.secret:
 		return
+	var x0 := 10.0 + 4 * 139.0 + 16
 	var l := UI.label("Agenda segreta:", 20, UI.GOLD, UI.font_bold)
-	l.position = Vector2(12, 196)
+	l.position = Vector2(x0, 226)
 	hand_box.add_child(l)
-	var x := 140.0
+	var x := x0
+	var yy := 256.0
 	for t in e.players[p]["sa"]:
 		var idx := int(t)
 		var c: String = D.SA_TOKENS[idx]
 		var mine: bool = e.countries[c]["pa"] == p
 		var tr := UI.icon_rect(UI.agenda_tex(idx, true), Vector2(110, 44))
 		tr.stretch_mode = TextureRect.STRETCH_SCALE
-		tr.position = Vector2(x, 188)
+		tr.position = Vector2(x, yy)
 		tr.mouse_filter = Control.MOUSE_FILTER_STOP
 		var fr := Panel.new()
 		fr.size = tr.size
@@ -791,8 +809,11 @@ func _agenda_row(p: int) -> void:
 		tr.mouse_exited.connect(_hide_zoom)
 		hand_box.add_child(tr)
 		x += 118.0
+		if x + 110 > CRW:
+			x = x0
+			yy += 52.0
 	var v := UI.label("(%d PV ora, nascosti agli altri)" % e.agenda_vp(p), 18, UI.MUTED)
-	v.position = Vector2(x + 6, 198)
+	v.position = Vector2(x0, yy + 56)
 	hand_box.add_child(v)
 
 
@@ -850,53 +871,37 @@ func _hide_zoom() -> void:
 
 # ------------------------------------------------------------------- mappa dei fronti
 
+## Posizione sulla mappa in pixel dell'immagine originale (1760 × 2100), lo spazio usato dalla mappa 3D.
 func _mpos(key: String) -> Vector2:
-	return D.mil_pos(key) * MIL_RECT.size
+	return D.mil_pos(key) * Vector2(D.MIL_W, D.MIL_H)
 
 
 func _refresh_mil() -> void:
 	var e := engine
-	for c in mil_layer.get_children():
-		c.queue_free()
+	var m := map3d
+	m.clear_pieces()
+	m.anchors.clear()
 	var targets := _map_targets()
-	# paesi: reti e allineamenti
+	m.targets = targets
+	for k in targets:
+		m.anchors[k] = _anchor_of(k)
+		m.ring(m.anchors[k], 0.42 if k.begins_with("b:") else 0.34)
+	# paesi: reti clandestine (dischi) e allineamenti politici (pedine)
 	for c in D.COUNTRY_ORDER:
 		var cc: Dictionary = e.countries[c]
 		var pos := _mpos(c)
-		if cc["cn"] > 0:
-			for k in range(cc["cn"]):
-				var dsc := Panel.new()
-				dsc.size = Vector2(18, 18)
-				dsc.position = pos + Vector2(-26 + k * 20, 6)
-				dsc.add_theme_stylebox_override("panel", UI.panel_style(UI.pcol(cc["cn_p"]), Color("#f4ecd8"), 2, 9))
-				dsc.mouse_filter = Control.MOUSE_FILTER_IGNORE
-				mil_layer.add_child(dsc)
+		m.anchors["c:" + c] = pos
+		for k in range(cc["cn"]):
+			m.cn_disc(pos + Vector2(-44 + k * 44, 28), UI.pcol(cc["cn_p"]))
 		if cc["pa"] >= 0:
-			var pa := Panel.new()
-			pa.size = Vector2(22, 26)
-			pa.position = pos + Vector2(10, -2)
-			pa.add_theme_stylebox_override("panel", UI.panel_style(UI.pcol(cc["pa"]), Color("#101010"), 2, 4))
-			pa.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			mil_layer.add_child(pa)
-			var al := UI.label("AP", 12, Color.WHITE, UI.font_bold)
-			al.position = Vector2(3, 3)
-			pa.add_child(al)
-		var hot := Control.new()
-		hot.size = Vector2(52, 46)
-		hot.position = pos - Vector2(26, 23)
-		hot.mouse_filter = Control.MOUSE_FILTER_STOP
-		hot.tooltip_text = _country_tip(c)
-		mil_layer.add_child(hot)
-		if targets.has("c:" + c):
-			_target_ring(pos, Vector2(56, 50), targets["c:" + c])
+			m.pa_pawn(pos + Vector2(52, -12), UI.pcol(cc["pa"]))
 	# riquadri: supporti navali
 	for b in D.BOXES:
 		var pos2 := _mpos("box:" + b)
+		m.anchors["b:" + b] = pos2
 		if e.naval[b] > 0:
-			_badge(pos2 + Vector2(-34, 8), "naval", str(e.naval[b]), Color("#2a5aa8"))
-		if targets.has("b:" + b):
-			_target_ring(pos2, Vector2(70, 60), targets["b:" + b])
-	# fronti
+			m.chips(pos2 + Vector2(-60, 44), e.naval[b], "naval", 0.5)
+	# fronti: blocchetti, supporti, riserve dell'Asse, offensive dirette
 	var at_space := {}
 	for fi in range(e.fronts.size()):
 		var f: Dictionary = e.fronts[fi]
@@ -904,115 +909,75 @@ func _refresh_mil() -> void:
 		var key: String = ("box:" + D.FRONTS[fi]["box"]) if sp == "" else sp
 		var k: int = at_space.get(key, 0)
 		at_space[key] = k + 1
-		var pos3 := _mpos(key) + Vector2(k * 22 - (8 if k > 0 else 0), k * 16 - 6)
-		var mk := Panel.new()
-		mk.size = Vector2(52, 26)
-		mk.position = pos3 - mk.size / 2
-		mk.add_theme_stylebox_override("panel", UI.panel_style(UI.pcol(D.FRONTS[fi]["who"]), Color("#f4ecd8"), 2, 4))
-		mk.tooltip_text = _front_tip(fi)
-		mil_layer.add_child(mk)
-		var ml := UI.label(SHORT[D.FRONTS[fi]["id"]], 15, Color.WHITE, UI.font_bold)
-		ml.position = Vector2(4, 1)
-		mk.add_child(ml)
+		var bpos := _mpos(key) + Vector2(k * 92 - (32 if k > 0 else 0), k * 20 - 8)
+		m.front_block(fi, bpos, SHORT[D.FRONTS[fi]["id"]])
+		m.anchors["fb:%d" % fi] = bpos
 		var en := e.entry(fi)
 		if en == "":
 			continue
-		var ep := _mpos(en)
-		if fi == 0 and en == "germany":
-			ep += Vector2(-30, 26)
-		elif fi == 2 and en == "germany":
-			ep += Vector2(30, 26)
+		var ep := _entry_px(fi)
+		m.anchors["f:%d" % fi] = ep
 		if f["off"] > 0:
-			_badge(ep + Vector2(-34, 10), "offensive", str(f["off"]), Color("#6b5a3a"))
+			m.chips(ep + Vector2(-68, -20), f["off"], "offsup", 0.52)
 		if f["res"] > 0 and e.phase in ["war", "agenda", "meeting", "decision"]:
-			_cubes(ep + Vector2(8, 10), f["res"], Color("#111111") if D.FRONTS[fi]["th"] == "eu" else Color("#b8a27a"))
-		for dd in f["do"]:
-			var dm := Panel.new()
-			dm.size = Vector2(30, 20)
-			dm.position = ep + Vector2(-15 + f["do"].find(dd) * 8, -34)
-			dm.add_theme_stylebox_override("panel", UI.panel_style(UI.pcol(dd["flag"]), Color("#ffe080"), 2, 3))
-			dm.tooltip_text = "Offensiva Diretta di %s (2 Produzione)" % D.POWERS[dd["flag"]]["nation"]
-			mil_layer.add_child(dm)
-			var dl := UI.label("OD", 12, Color.WHITE, UI.font_bold)
-			dl.position = Vector2(5, 1)
-			dm.add_child(dl)
-		if targets.has("f:%d" % fi):
-			_target_ring(ep, Vector2(64, 54), targets["f:%d" % fi])
+			m.cubes(ep + Vector2(52, 28), f["res"], Color("#2b2b2b") if D.FRONTS[fi]["th"] == "eu" else Color("#c8641f"))
+		for j in range(f["do"].size()):
+			var dd: Dictionary = f["do"][j]
+			m.issue_chit(ep + Vector2(-12 + j * 20, -80 - j * 8), UI.tex("res://assets/issues/do_%s.jpg" % ["uk", "us", "ussr"][int(dd["flag"])]))
 	# comando dei teatri
 	for th in ["eu", "pa"]:
-		var cpos := _mpos("cmd:" + th) + Vector2(0, 44)
-		var cm := Panel.new()
-		cm.size = Vector2(50, 26)
-		cm.position = cpos - cm.size / 2
-		cm.add_theme_stylebox_override("panel", UI.panel_style(UI.pcol(e.lead[th]), Color("#f4ecd8"), 2, 13))
-		mil_layer.add_child(cm)
-		var cl := UI.label(D.POWERS[e.lead[th]]["short"], 14, Color.WHITE, UI.font_bold)
-		cl.position = Vector2(8, 2)
-		cm.add_child(cl)
+		var cpos := _mpos("cmd:" + th) + Vector2(0, 104)
+		m.cmd_block(cpos, UI.pcol(e.lead[th]), D.POWERS[e.lead[th]]["short"])
+		m.anchors["cmd:" + th] = cpos
 	# Bomba A e spie
-	var abp := _mpos("ab%d" % e.abomb) + Vector2(-14, 0)
-	_pawn(abp, UI.pcol(1), "Bomba A (USA): %s" % D.ABOMB[e.abomb])
-	var spp := _mpos("ab%d" % e.spy) + Vector2(14, 0)
-	_pawn(spp, UI.pcol(2), "Rete di spie sovietica: %s" % D.ABOMB[e.spy])
+	var abp := _mpos("ab%d" % e.abomb) + Vector2(-32, 0)
+	m.pawn(abp, UI.pcol(1))
+	m.anchors["ab"] = abp
+	var spp := _mpos("ab%d" % e.spy) + Vector2(32, 0)
+	m.pawn(spp, UI.pcol(2))
+	m.anchors["spy"] = spp
 	_refresh_fronts_panel()
 
 
-func _badge(pos: Vector2, icon: String, txt: String, col: Color) -> void:
-	var b := Panel.new()
-	b.size = Vector2(46, 24)
-	b.position = pos
-	b.add_theme_stylebox_override("panel", UI.panel_style(col, Color("#f4ecd8"), 1, 4))
-	b.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	mil_layer.add_child(b)
-	var ic := UI.icon_rect(UI.icon(icon), Vector2(22, 20))
-	ic.position = Vector2(2, 2)
-	b.add_child(ic)
-	var l := UI.label(txt, 17, Color.WHITE, UI.font_bold)
-	l.position = Vector2(27, 0)
-	b.add_child(l)
+## Pixel della mappa dello spazio d'ingresso di un fronte (i due fronti contro la Germania ai lati).
+func _entry_px(fi: int) -> Vector2:
+	var en := engine.entry(fi)
+	var ep := _mpos(en)
+	if fi == 0 and en == "germany":
+		ep += Vector2(-72, 60)
+	elif fi == 2 and en == "germany":
+		ep += Vector2(72, 60)
+	return ep
 
 
-func _cubes(pos: Vector2, n: int, col: Color) -> void:
-	for k in range(n):
-		var c := ColorRect.new()
-		c.color = col
-		c.size = Vector2(11, 11)
-		c.position = pos + Vector2((k % 4) * 13, (k / 4) * 13)
-		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		mil_layer.add_child(c)
-		var br := ReferenceRect.new()
-		br.border_color = Color("#d0c0a0")
-		br.editor_only = false
-		br.size = c.size
-		br.position = c.position
-		br.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		mil_layer.add_child(br)
+func _anchor_of(k: String) -> Vector2:
+	if k.begins_with("c:"):
+		return _mpos(k.substr(2))
+	if k.begins_with("b:"):
+		return _mpos("box:" + k.substr(2))
+	if k.begins_with("f:"):
+		return _entry_px(int(k.substr(2)))
+	return Vector2.INF
 
 
-func _pawn(pos: Vector2, col: Color, tip: String) -> void:
-	var p := Panel.new()
-	p.size = Vector2(20, 26)
-	p.position = pos - Vector2(10, 13)
-	p.add_theme_stylebox_override("panel", UI.panel_style(col, Color("#f4ecd8"), 2, 10))
-	p.tooltip_text = tip
-	mil_layer.add_child(p)
-
-
-func _target_ring(pos: Vector2, sz: Vector2, cb: Callable) -> void:
-	var r := Panel.new()
-	r.size = sz
-	r.position = pos - sz / 2
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(1, 0.85, 0.3, 0.16)
-	sb.border_color = UI.GOLD
-	sb.set_border_width_all(3)
-	sb.set_corner_radius_all(8)
-	r.add_theme_stylebox_override("panel", sb)
-	r.mouse_filter = Control.MOUSE_FILTER_STOP
-	r.gui_input.connect(func(ev):
-		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
-			cb.call())
-	mil_layer.add_child(r)
+func _map_tip(k: String) -> String:
+	if k.begins_with("c:"):
+		return _country_tip(k.substr(2))
+	if k.begins_with("f:"):
+		return _front_tip(int(k.substr(2)))
+	if k.begins_with("fb:"):
+		return _front_tip(int(k.substr(3)))
+	if k.begins_with("b:"):
+		var b := k.substr(2)
+		return "%s\nSupporti navali: %d" % [D.BOXES[b]["n"], engine.naval[b]]
+	if k.begins_with("cmd:"):
+		var th := k.substr(4)
+		return "Comando del teatro %s: %s" % ["europeo" if th == "eu" else "del Pacifico", D.POWERS[engine.lead[th]]["nation"]]
+	if k == "ab":
+		return "Bomba A (USA): %s" % D.ABOMB[engine.abomb]
+	if k == "spy":
+		return "Rete di spie sovietica: %s" % D.ABOMB[engine.spy]
+	return ""
 
 
 func _country_tip(c: String) -> String:
@@ -1162,15 +1127,15 @@ func _show_decision() -> void:
 			_add_btn("GIOCA LA CARTA", func(): _provide(sel_card), true).disabled = true
 		"agenda_pick":
 			if req.get("first", false):
-				action_msg.text = who + "hai vinto l'Agenda: scegli un tema (casella in alto a destra) da mettere sul tuo tracciato, a %d spazi dal centro." % int(req.get("diff", 0))
+				action_msg.text = who + "hai vinto l'Agenda: scegli un tema da mettere sul tuo tracciato, a %d spazi dal centro (qui sotto o sul tavolo)." % int(req.get("diff", 0))
 			else:
-				action_msg.text = who + "scegli un tema da mettere al centro del tavolo (clic sulle caselle evidenziate in alto a destra)."
-			for ii in req["options"]:
-				_add_btn(D.ISSUES[ii]["n"], func(): _provide(ii), false, 17)
+				action_msg.text = who + "scegli un tema da mettere al centro del tavolo (qui sotto o sulle caselle evidenziate del tavolo)."
+			_issue_row(req["options"])
 		"advance":
 			_advance_ui()
 		"advance_cos":
-			action_msg.text = who + "il dado dà %d per %s: scegli il tema da far avanzare (clic sul tavolo)." % [int(req["roll"]), D.STAFF[p][int(req["card"])]["n"]]
+			action_msg.text = who + "il dado dà %d per %s: scegli il tema da far avanzare (qui sotto o sul tavolo)." % [int(req["roll"]), D.STAFF[p][int(req["card"])]["n"]]
+			_issue_row(req["issues"])
 		"debate":
 			_debate_ui()
 		"cond_stop":
@@ -1220,6 +1185,34 @@ func _show_decision() -> void:
 	_fit_action.call_deferred()
 
 
+## Fila di pedine dei temi: si sceglie il tema da qui o dal tavolo (evidenziate quelle cliccabili ora).
+func _issue_row(list: Array) -> void:
+	var click := _clickable_issues()
+	var arr := list.duplicate()
+	arr.sort()
+	var sz := Vector2(70, 65) if arr.size() <= 11 else Vector2(58, 54)
+	for ii in arr:
+		var i: int = ii
+		var on := click.has(i)
+		var c := Panel.new()
+		c.custom_minimum_size = sz
+		c.add_theme_stylebox_override("panel", UI.panel_style(Color("#000000"), UI.GOLD if on else Color("#3a3226"), 3 if on else 1, 5))
+		var tr := UI.icon_rect(UI.issue_tex(i), sz - Vector2(6, 6))
+		tr.position = Vector2(3, 3)
+		tr.stretch_mode = TextureRect.STRETCH_SCALE
+		c.add_child(tr)
+		if not on:
+			c.modulate = Color(0.6, 0.6, 0.6)
+		c.tooltip_text = _issue_tip(i)
+		c.mouse_filter = Control.MOUSE_FILTER_STOP
+		if on:
+			c.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+			c.gui_input.connect(func(ev):
+				if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+					_on_issue_click(i))
+		issue_row.add_child(c)
+
+
 func _add_btn(text: String, cb: Callable, primary := false, fs := 20) -> Button:
 	var b := Button.new()
 	b.text = text
@@ -1234,6 +1227,8 @@ func _add_btn(text: String, cb: Callable, primary := false, fs := 20) -> Button:
 
 func _clear_actions() -> void:
 	for c in action_row.get_children():
+		c.queue_free()
+	for c in issue_row.get_children():
 		c.queue_free()
 	action_msg.text = ""
 	_fit_action.call_deferred()
@@ -1255,6 +1250,8 @@ func _provide(r) -> void:
 	sel_leader = false
 	_clear_actions()
 	_hide_zoom()
+	if modal.get_child_count() > 0:
+		_clear_modal()
 	engine.provide_decision(r)
 	refresh()
 
@@ -1351,6 +1348,7 @@ func _advance_ui() -> void:
 				if v != int(sd["v"]):
 					vals.append("%s %d" % [D.ISSUES[ii]["n"], v])
 			action_msg.text = who + "%s (%d): clic sul tema da far avanzare.%s" % [sd["n"], int(sd["v"]), (" Valori modificati: " + ", ".join(vals) + ".") if not vals.is_empty() else ""]
+	_issue_row(req["issues"])
 	if req.get("leader_ok", false):
 		var b := _add_btn("USA IL LEADER" if not sel_leader else "NON USARE IL LEADER", func():
 			sel_leader = not sel_leader
@@ -1565,6 +1563,8 @@ func _on_pause(req: Dictionary) -> void:
 			r2.text = s2
 			vb2.add_child(r2)
 		"war":
+			step_skip = false
+			map3d.clear_dice()
 			_set_view("mil")
 			var vb3 := _open_modal("FASE MILITARE", 820)
 			var r3 := UI.rich(20)
@@ -1580,6 +1580,50 @@ func _on_pause(req: Dictionary) -> void:
 		_clear_modal()
 		engine.provide_decision(true))
 	vbl.add_child(b)
+
+
+## Un passo della fase militare: il dado rotola sul tavolo, poi la spiegazione e AVANTI.
+func _on_step(data: Dictionary) -> void:
+	if step_skip:
+		engine.provide_decision.call_deferred(true)
+		return
+	if auto_view and view != "mil":
+		_set_view("mil")
+	else:
+		refresh()
+	_clear_actions()
+	action_box.visible = true
+	action_box.move_to_front()
+	var at: String = data.get("at", "")
+	var px := Vector2.INF
+	if at != "":
+		px = _mpos(at)
+		if px != Vector2.ZERO:
+			map3d.focus(px, 11.0)
+	var sides := int(data.get("sides", 0))
+	if sides > 0 and px != Vector2.INF:
+		action_msg.text = "[i]Tiro del dado…[/i]"
+		await map3d.roll_die(sides, int(data["roll"]), px, Color("#7a1616") if sides == 10 else Color("#1c1c1c"))
+	else:
+		map3d.clear_dice()
+	if not is_instance_valid(self):
+		return
+	var head := ""
+	if sides > 0:
+		head = "[font_size=26][color=%s][b]d%d: %d[/b][/color][/font_size]   " % ["#7fd36f" if data.get("ok", true) else "#e07a5a", sides, int(data["roll"])]
+	action_msg.text = head + str(data.get("text", ""))
+	step_waiting = true
+	_add_btn("AVANTI", func():
+		step_waiting = false
+		_clear_actions()
+		engine.provide_decision(true), true)
+	_add_btn("SALTA ALLA FINE DELLA FASE", func():
+		step_waiting = false
+		step_skip = true
+		_clear_actions()
+		map3d.clear_dice()
+		engine.provide_decision(true))
+	_fit_action.call_deferred()
 
 
 func _on_fx(kind: String, data: Dictionary) -> void:

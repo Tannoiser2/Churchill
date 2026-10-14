@@ -14,6 +14,7 @@ signal decision_provided(result)
 signal game_ended(results: Dictionary)
 signal fx(kind: String, data: Dictionary)
 signal pause_requested(req: Dictionary)
+signal step_requested(data: Dictionary)
 
 const D = preload("res://scripts/data/ch_data.gd")
 const UK := 0
@@ -252,6 +253,24 @@ func pause_point(req: Dictionary) -> void:
 		return
 	pause_requested.emit(req)
 	await decision_provided
+
+
+## Passo della fase militare mostrato a chi guarda (dadi sul tavolo, spiegazione e AVANTI).
+## Non cambia nulla della partita: il motore aspetta solo che la persona vada avanti.
+func war_step(text: String, at := "", sides := 0, roll := 0, ok := true) -> void:
+	changed.emit()
+	if headless or abort or not pause_enabled:
+		return
+	if online != null and online.catchup:
+		return
+	if not any_local_human():
+		return
+	step_requested.emit({"text": text, "at": at, "sides": sides, "roll": roll, "ok": ok})
+	await decision_provided
+
+
+func _fname(fi: int) -> String:
+	return D.FRONTS[fi]["n"]
 
 
 func _set_phase(ph: String) -> void:
@@ -1667,9 +1686,12 @@ func _war() -> void:
 	step = "military"
 	changed.emit()
 	if not germany_surr:
-		_reserves_europe()
+		await war_step("[b]Teatro europeo[/b]: le riserve tedesche e italiane si schierano contro i fronti alleati, poi ogni fronte tenta di avanzare con 1d10.")
+		await _reserves_europe()
 		for fi in [0, 1, 2]:
-			_advance_front(fi)
+			await _advance_front(fi)
+			if abort:
+				return
 		if not germany_by.is_empty():
 			germany_surr = true
 			var w: bool = 0 in germany_by
@@ -1689,9 +1711,12 @@ func _war() -> void:
 			war_report.append("LA GERMANIA SI ARRENDE")
 			fx.emit("surrender", {"who": "germany"})
 	if not japan_surr:
-		_reserves_pacific()
+		await war_step("[b]Teatro del Pacifico[/b]: le riserve giapponesi si schierano, poi ogni fronte tenta di avanzare con 1d10.")
+		await _reserves_pacific()
 		for fi in [3, 4, 5, 6]:
-			_advance_front(fi)
+			await _advance_front(fi)
+			if abort:
+				return
 		if japan_occupied:
 			japan_surr = true
 		elif germany_surr and abomb >= 4 and b29_entered and fronts[3]["pos"] >= 1:
@@ -1888,25 +1913,30 @@ func _reserves_europe() -> void:
 			_res(E, b)
 		else:
 			_res(W if wg else E, n)
+		await war_step("Difesa della Germania: %d armat%s tedesc%s a protezione di Berlino contro %s." % [n, "a" if n == 1 else "e", "a" if n == 1 else "he", "i Fronti Occidentale e Orientale" if wg and eg else ("il Fronte Occidentale" if wg else "il Fronte Orientale")], "germany")
 	# 2. un'armata contro il Fronte Orientale
 	if ger > 0 and entry(E) != "":
 		ger -= 1
 		_res(E, 1)
+		await war_step("Un'armata tedesca resta sempre contro il Fronte Orientale (in %s)." % D.SPACES[entry(E)]["n"], entry(E))
 	# 3. battaglia dell'Atlantico
 	if fronts[W]["pos"] < 0 and navy > 0:
 		navy = 0
 		if naval["west"] > 0:
 			naval["west"] -= 1
 			war_report.append("U-Boot: perso un supporto navale nel Teatro Occidentale.")
+			await war_step("Battaglia dell'Atlantico: il Fronte Occidentale non ha ancora lasciato il suo riquadro, gli U-Boot affondano un supporto navale nel Teatro Occidentale.", "box:west")
 	# 4. orda orientale
 	if fronts[W]["pos"] < 1 and ger > 0 and entry(E) != "":
 		var n4 := mini(4, ger)
 		ger -= n4
 		_res(E, n4)
+		await war_step("Orda orientale: il Fronte Occidentale non è ancora sbarcato, quindi %d armate tedesche vanno contro il Fronte Orientale." % n4, entry(E))
 	# 5. Vallo Atlantico
 	if fronts[W]["pos"] == 0 and ger > 0:
 		ger -= 1
 		_res(W, 1)
+		await war_step("Vallo Atlantico: un'armata tedesca difende la Normandia dallo sbarco.", entry(W))
 	# 6. dopo lo sbarco: due armate contro il fronte più vicino alla Germania
 	if normandy_conf >= 0 and ger > 0 and entry(W) != "" and entry(E) != "":
 		var dw: int = 5 - fronts[W]["pos"]
@@ -1921,21 +1951,34 @@ func _reserves_europe() -> void:
 			_res(W, 1)
 			if n6 > 1:
 				_res(E, 1)
+		await war_step("Dopo lo sbarco in Normandia: %d armate tedesche contro il fronte più vicino alla Germania%s." % [n6, " (sono alla stessa distanza: una per parte)" if dw == de else ""], entry(W) if dw <= de else entry(E))
 	# 7. l'armata italiana
 	if ita > 0 and entry(M) != "":
 		_res(M, 1)
+		await war_step("L'armata italiana difende contro il Fronte del Mediterraneo.", entry(M))
 	# 8. le altre armate a caso
 	for k in range(ger):
 		var r := d6()
+		var txt := "Armata tedesca di riserva (%d di %d): 1-2 Occidentale, 3-4 Orientale, 5 Mediterraneo, 6 Artico. " % [k + 1, ger]
+		var at := ""
 		if r <= 2:
 			_res(W, 1)
+			txt += "Va contro il Fronte Occidentale."
+			at = entry(W)
 		elif r <= 4:
 			_res(E, 1)
+			txt += "Va contro il Fronte Orientale."
+			at = entry(E)
 		elif r == 6 and naval["arctic"] >= 3:
 			naval["arctic"] -= 1
 			war_report.append("Riserva tedesca nell'Artico: perso un supporto navale.")
+			txt += "Attacca i convogli dell'Artico: perso un supporto navale."
+			at = "box:arctic"
 		else:
 			_res(M, 1)
+			txt += "Va contro il Fronte del Mediterraneo%s." % (" (senza 3 supporti navali nell'Artico il 6 vale come 5)" if r == 6 else "")
+			at = entry(M)
+		await war_step(txt, at, 6, r)
 
 
 func _reserves_pacific() -> void:
@@ -1954,14 +1997,18 @@ func _reserves_pacific() -> void:
 		var extra := jap % att.size()
 		var order := att.duplicate()
 		_shuffle(order)
+		var names := []
 		for k in range(order.size()):
 			_res(order[k], per + (1 if k < extra else 0))
+			names.append(D.FRONTS[order[k]]["id"])
+		await war_step("Difesa del Giappone: tutte le %d armate giapponesi restano in patria contro i fronti che tentano lo sbarco." % jap, "japan")
 		jap = 0
 	# 2. contro il Fronte dell'Estremo Oriente se è uscito dal suo riquadro
 	if fronts[FE]["pos"] >= 0 and jap > 0 and entry(FE) != "":
 		var n2 := mini(2, jap)
 		jap -= n2
 		_res(FE, n2)
+		await war_step("Il Fronte dell'Estremo Oriente è entrato in guerra: %d armate giapponesi lo fronteggiano." % n2, entry(FE))
 	# 3. basi B29
 	for fi in [CP, SW, CBI]:
 		if jap <= 0:
@@ -1969,16 +2016,19 @@ func _reserves_pacific() -> void:
 		if can_attempt(fi) and D.SPACES[entry(fi)].get("b29", false):
 			jap -= 1
 			_res(fi, 1)
+			await war_step("Basi dei B29: un'armata giapponese difende %s dal %s." % [D.SPACES[entry(fi)]["n"], _fname(fi)], entry(fi))
 	# flotta giapponese uscita per la carta Conferenza
 	if ijn_card != "" and ijn_left > 0:
 		var fi2 := D.front_index(ijn_card)
-		_ijn(fi2)
+		await war_step("La carta Conferenza fa uscire la flotta giapponese contro il %s." % _fname(fi2), "box:" + D.FRONTS[fi2]["box"])
+		await _ijn(fi2)
 		if ijn_card_res > 0 and jap > 0:
 			jap -= 1
 			_res(fi2, 1)
 	elif ijn_left > 0:
 		# 4. sortita della flotta giapponese
 		var r := d6()
+		await war_step("Sortita della flotta giapponese: con 1-2 attacca un fronte che sta per sbarcare, con 3-6 resta in porto. %s" % ("Esce in mare!" if r <= 2 else "Resta in porto."), "japan", 6, r, r > 2)
 		if r <= 2:
 			var tgt := -1
 			for fi in [CP, SW, CBI]:
@@ -1988,11 +2038,13 @@ func _reserves_pacific() -> void:
 					break
 			if tgt < 0:
 				tgt = [CP, SW, CBI][rng.randi_range(0, 2)]
-			_ijn(tgt)
+			await _ijn(tgt)
 	# 6. le altre armate a caso
 	for k in range(jap):
 		var r2 := d6()
-		_res(CP if r2 <= 2 else (SW if r2 <= 4 else CBI), 1)
+		var fr: int = CP if r2 <= 2 else (SW if r2 <= 4 else CBI)
+		_res(fr, 1)
+		await war_step("Armata giapponese di riserva (%d di %d): 1-2 Pacifico Centrale, 3-4 Pacifico Sud-Occidentale, 5-6 Cina-Birmania-India. Va contro il %s." % [k + 1, jap, _fname(fr)], entry(fr) if entry(fr) != "" else "box:" + D.FRONTS[fr]["box"], 6, r2)
 
 
 func _ijn(fi: int) -> void:
@@ -2008,6 +2060,7 @@ func _ijn(fi: int) -> void:
 		msg += "; la flotta rientra in Giappone (dado %d)." % r
 	war_report.append(msg)
 	log_msg(msg)
+	await war_step("Battaglia navale: la flotta giapponese affonda un supporto navale nel %s. Con 1-4 la flotta viene distrutta, con 5-6 rientra in Giappone. %s" % [D.BOXES[box]["n"], "Distrutta!" if r <= 4 else "Rientra in Giappone."], "box:" + box, 6, r, r <= 4)
 
 
 func _advance_front(fi: int) -> void:
@@ -2023,6 +2076,7 @@ func _advance_front(fi: int) -> void:
 		war_report.append("%s: fermo (%s)." % [nm, why])
 		log_msg("%s non avanza: %s." % [nm, why])
 		f["off"] = 0
+		await war_step("[b]%s[/b]: non può tentare di avanzare (%s)." % [nm, why], entry(fi))
 		return
 	var s := strength(fi)
 	if s <= 0:
@@ -2030,8 +2084,11 @@ func _advance_front(fi: int) -> void:
 		war_report.append("%s: forza %d (%d supporti, %d riserve), nessun tiro." % [nm, s, f["off"], f["res"]])
 		log_msg("%s: forza %d, non può avanzare." % [nm, s])
 		f["off"] = 0
+		await war_step("[b]%s[/b]: forza %d (2 + 2×%d supporti − 2×%d riserve). Con forza 0 o meno non si tira: nessun progresso." % [nm, s, f["off"], f["res"]], entry(fi))
 		return
 	var r := rng.randi_range(1, 10)
+	var ent0 := entry(fi)
+	var off0: int = f["off"]
 	var mr := r + maxi(0, s - 10)
 	var ok: bool = s >= 10 or r <= s
 	var txt := "%s: forza %d (%d supporti, %d riserve), dado %d" % [nm, s, f["off"], f["res"], r]
@@ -2055,7 +2112,14 @@ func _advance_front(fi: int) -> void:
 		f["last"] = "dado %d, fermo" % r
 	war_report.append(txt)
 	log_msg(txt)
+	var ex := "[b]%s[/b]: forza %d (2 + 2×%d supporti − 2×%d riserve). " % [nm, s, off0, f["res"]]
+	if s >= 10:
+		ex += "Con forza 10 o più avanza sempre; il dado più l'eccedenza (%d) a 10 o più dà lo sfondamento di due spazi. " % (s - 10)
+	else:
+		ex += "Serve un dado da 1 a %d per entrare in %s. " % [s, D.SPACES[ent0]["n"]]
+	ex += "Dado %d: %s" % [r, txt.get_slice(": ", txt.get_slice_count(": ") - 1)]
 	f["off"] = 0
+	await war_step(ex, ent0, 10, r, ok)
 
 
 # ------------------------------------------------------------------ punteggio

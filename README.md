@@ -8,6 +8,18 @@ Tabletop Simulator; non vanno distribuite pubblicamente.
 
 **Gioca nel browser:** https://tannoiser2.github.io/Churchill/
 
+
+## Mappa dei fronti in 3D
+- Il tabellone militare è un tavolo 3D: trascina col tasto sinistro per spostarti, col destro per ruotare,
+  rotellina per lo zoom (⌂ rimette la vista intera). Fronti, comandi dei teatri e pedine sono i blocchetti
+  e i segnalini del modulo Tabletop Simulator (`assets/pieces/`); le riserve dell'Asse sono cubetti, reti e
+  allineamenti dischi e pedine nei colori delle potenze. Clic su un paese, un riquadro o un ingresso per
+  scegliere il bersaglio quando serve.
+- La fase militare va avanti un passo alla volta: ogni riserva dell'Asse, la flotta giapponese e il tiro
+  di ogni fronte si vedono sul tavolo, con il dado (d6 o d10) che rotola e la spiegazione dell'esito;
+  AVANTI passa al successivo, SALTA ALLA FINE DELLA FASE chiude tutto. I passi non cambiano la partita
+  (stesso motore e stessi dadi: le simulazioni danno gli stessi risultati di prima).
+
 ## Avvio
 1. Apri Godot 4 (testato su 4.7) → *Importa* → seleziona `project.godot`.
 2. Premi **F5**. F11 alterna schermo intero e finestra.

@@ -93,6 +93,19 @@ func _run() -> void:
 			await wait(4)
 			await shot("fine_mappa")
 			break
+		if g.step_waiting:
+			var nst: int = taken.get("_steps", 0)
+			taken["_steps"] = nst + 1
+			if nst < 5 or (nst % 9 == 0 and nst < 60):
+				await wait(30)
+				await shot("passo_%02d" % nst)
+				if OS.get_environment("CH_STEPS") != "" and nst >= 4:
+					quit()
+					return
+			g.step_waiting = false
+			g._clear_actions()
+			g.engine.provide_decision(true)
+			continue
 		var req: Dictionary = g.pending
 		if req.is_empty():
 			if g.modal.get_child_count() > 0 and g.engine.phase != "end":
